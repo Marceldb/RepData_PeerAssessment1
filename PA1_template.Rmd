@@ -1,25 +1,192 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Peer_graded_Assignment_Course_Project1"
+author: "mdb"
+date: "28 settembre 2018"
+output: html_document
 ---
 
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 
+## Introduction
 
-## What is the average daily activity pattern?
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+The data for this assignment can be downloaded from the course web site:
+
+Dataset: Activity monitoring data [52K]
+The variables included in this dataset are:
+
+- steps: Number of steps taking in a 5-minute interval (missing values are coded as \color{red}{\verb|NA|}NA)
+
+- date: The date on which the measurement was taken in YYYY-MM-DD format
+
+- interval: Identifier for the 5-minute interval in which measurement was taken
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+##Commit containing full submission
+
+###1 Dataset reading and pre-processing
+```{r Dataset reading and pre-process, echo=TRUE}
+library(readr)
+
+activity<-read.csv("activity.csv",  header = TRUE)
+head(activity)
+summary(activity)
 
 
 
-## Imputing missing values
+
+```
+NAs are in steps variable only. 2304 occurences, about 13% of total observations. As by specifications, we ignore NAs for the moment-
+
+We need to transform (preprocess) the date variable from factor to date for later use
+
+```{r from factor to date}
+activity$date<-as.Date(activity$date)
+```
+
+## 2 What is the average number of steps taken per day?
+### 2.1 calculating daily means
+
+```{r Calculating daily means }
+
+library(dplyr)
+# tot by date
+activity_bydate <-activity%>%
+group_by(date) %>%
+summarize(tot_steps = sum(steps))
+
+
+```
+
+### 2.2 Histogram of daily steps taken
+
+```{r Plotting daily steps}
+library(ggplot2)
+
+p2<-activity_bydate %>% 
+        ggplot(aes(tot_steps)) + 
+        geom_histogram(binwidth = 2500, colour="black", fill="red") +
+        ggtitle("Steps by day")+
+        xlab("Steps")+
+        theme_bw()
+p2
+```
+
+### 2.3 Calculating total mean and median
+
+```{r Calculating total mean and median}
+# mean and median total
+totmean <- mean(activity_bydate$tot_steps, na.rm = T)
+totmedian <- median(activity_bydate$tot_steps, na.rm = T)
+
+print(totmean)
+print(totmedian)
+```
+
+## 3 Average number of steps taken by interval
+### 3.1 Time series
+
+```{r Calculating averages by intervals }
+
+# tot by interval
+library(dplyr)
+activity_byinterval <-activity%>%
+group_by(interval) %>%
+summarize(avg_steps = mean(steps, na.rm=T))
+
+
+```
+
+
+```{r Time series}
+activity_byinterval %>% 
+        ggplot(aes(interval, avg_steps))+
+        geom_line()+
+        theme_bw()+
+        ggtitle("Avg steps taken daily, by 5 minutes intervals")
+        
+
+```
+
+
+### 3.2 Interval with the maximum number of steps
+
+```{r  5 minutes Interval with Max Avg number of steps}
+max_interval<-activity_byinterval %>% 
+        filter(avg_steps==max(avg_steps))
+print(max_interval$interval)
+```
+
+## 4 Missing data strategy
+We have seen from the summary() function at point 1, that there are 2304 NAs in the steps field. WE can now correct them, inputing an average value by interval
+
+```{r  Calculating average steps by interval and inputing by interval to NAs in the original set}
+
+activity_no_na<-activity %>% inner_join(activity_byinterval, by = "interval") 
+activity_no_na$steps_nona<-activity_no_na$steps
+
+activity_no_na<-activity_no_na %>%     mutate(steps_nona = case_when(is.na(steps)  ~ avg_steps,TRUE ~  as.double(steps_nona)))
+
+
+summary(activity_no_na)
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+        
+```
+
+```{r  histogram with no more NAs}
+
+# 
+# tot by date
+activity_no_na_bydate <-activity_no_na%>%
+        group_by(date) %>%
+        summarize(tot_steps = sum(steps_nona))
+
+
+
+
+p4<-activity_no_na_bydate %>% 
+        ggplot(aes(tot_steps)) + 
+        geom_histogram(binwidth = 2500, colour="black", fill="yellow") +
+        ggtitle("Steps by day, NAs filled in")+
+        xlab("Steps")+
+        theme_bw()
+p4
+# mean and median total
+totmean_no_na <- mean(activity_no_na_bydate$tot_steps, na.rm = T)
+totmedian_no_na <- median(activity_no_na_bydate$tot_steps, na.rm = T)
+
+totmean_no_na 
+totmedian_no_na
+```
+
+
+## 5 Comparing weekdays and weekends
+
+```{r  Comparing weekdays and weekends}
+
+
+activity_no_na$day_type <- as.factor(ifelse(weekdays(activity_no_na$date) %in% c("sabato", "domenica"), "weekend", "weekday"))
+
+
+activity_no_na_byinterval <-activity_no_na%>%
+        select(interval,day_type, steps_nona)%>%               group_by(interval,day_type) %>%
+        summarize( avg_steps = mean(steps_nona))
+
+activity_no_na_byinterval %>% 
+        ggplot(aes(interval, avg_steps))+
+        geom_line()+
+        theme_bw()+
+        ggtitle("Avg steps taken daily, by 5 minutes intervals") +
+        facet_grid(~ day_type)
+```
+
+Interestingly, peak of activities are higher during weekdays than during the weekend.
+
+Possible causes, worthing further investigation could be: lifestyle, not wearing the device in certain occasions, errors in raw data, differences in type of activities taken 
