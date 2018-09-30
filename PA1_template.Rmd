@@ -1,8 +1,10 @@
 ---
 title: "Peer_graded_Assignment_Course_Project1"
 author: "mdb"
-date: "28 settembre 2018"
-output: html_document
+date: 28 settembre 2018
+output:
+  md_document:
+    variant: markdown_github  
 ---
 
 ```{r setup, include=FALSE}
